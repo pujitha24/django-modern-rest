@@ -3,6 +3,7 @@ from http import HTTPStatus
 from typing import TYPE_CHECKING, Any, final
 
 from django.http import HttpRequest, HttpResponse
+from django.utils.translation import get_language_from_path
 
 from dmr.exceptions import NotAcceptableError
 from dmr.internal.negotiation import negotiate_renderer
@@ -28,6 +29,21 @@ def normalize_prefixes(prefix: str, *prefixes: str) -> tuple[str, ...]:
     """
     all_prefixes = [prefix, *prefixes]
     return tuple(f'/{pref.strip("/")}/' for pref in all_prefixes)
+
+
+def is_prefixed_path(request: HttpRequest, prefixes: tuple[str, ...]) -> bool:
+    """
+    Check that request path starts with one of the normalized prefixes.
+
+    Language prefix, added by ``i18n_patterns``, is ignored.
+    """
+    path = request.path
+    if path.startswith(prefixes):
+        return True
+    if get_language_from_path(path):
+        _, _, path = path[1:].partition('/')
+        path = f'/{path}'
+    return path.startswith(prefixes)
 
 
 @final

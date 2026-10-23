@@ -61,6 +61,8 @@ ask your coding agent to use `$dmr-upgrade` to upgrade a project.
 - Fixed `jwt_expiration` and `jwt_refresh_expiration` passed to `as_view`
   of the cookie `concrete_views` changing the tokens, but not their cookies.
   They are typed `as_view` arguments now and are set on the class, #1690
+- Fixed `build_404_handler`, `build_500_handler`, and `build_csrf_failure_handler`
+  not matching prefixes when `i18n_patterns` adds a language prefix, #1702
 
 #### Components and serializers
 

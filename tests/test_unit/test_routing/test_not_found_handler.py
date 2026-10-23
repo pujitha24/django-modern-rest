@@ -4,10 +4,12 @@ from typing import Any
 
 import pytest
 from django.http import HttpRequest, HttpResponse
+from django.test import RequestFactory
 from django.urls import path
 from inline_snapshot import snapshot
 
 from dmr.errors import ErrorType
+from dmr.internal.error_handlers import is_prefixed_path
 from dmr.plugins.pydantic import PydanticSerializer
 from dmr.renderers import JsonRenderer
 from dmr.routing import build_404_handler
@@ -241,3 +243,33 @@ def test_not_found_format_by_accept_header(
     assert response.status_code == HTTPStatus.NOT_FOUND
     assert response.headers == expected_headers
     assert response.content == expected_data
+
+
+@pytest.mark.urls(__name__)
+@pytest.mark.parametrize('prefix', ['/en', '/en-us', '/ru-ru'])
+def test_language_prefix_is_ignored(
+    dmr_client: DMRClient,
+    prefix: str,
+) -> None:
+    """Ensure that ``i18n_patterns`` language prefix does not break prefix."""
+    response = dmr_client.get(
+        f'{prefix}/api/missing/',
+        headers={'Accept': 'application/json'},
+    )
+    assert response.status_code == HTTPStatus.NOT_FOUND
+    assert response['Content-Type'] == 'application/json'
+
+
+@pytest.mark.urls(__name__)
+def test_unknown_language_prefix(dmr_client: DMRClient) -> None:
+    """Ensure that unknown language prefix still returns Django's 404."""
+    response = dmr_client.get('/xx/api/missing/')
+    assert response.status_code == HTTPStatus.NOT_FOUND
+    assert response['Content-Type'] == 'text/html; charset=utf-8'
+
+
+def test_prefix_is_language_code(rf: RequestFactory) -> None:
+    """Ensure that API prefix equal to a language code still matches."""
+    assert is_prefixed_path(rf.get('/en-us/missing/'), ('/en-us/',))
+    assert is_prefixed_path(rf.get('/en-us/api/x/'), ('/api/',))
+    assert not is_prefixed_path(rf.get('/en-us/other/'), ('/api/',))
