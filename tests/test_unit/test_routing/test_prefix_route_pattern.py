@@ -1,6 +1,8 @@
 import pytest
 from django.http import HttpRequest, HttpResponse
 from django.urls import include
+from django.utils import translation
+from django.utils.functional import lazy
 
 from dmr.internal.routing import PrefixRoutePattern
 from dmr.routing import path
@@ -85,3 +87,28 @@ def test_path_exact_match() -> None:
 
     matched = url_pattern.pattern.match('users/')
     assert matched == ('', (), {})
+
+
+def _translated(suffix: str) -> str:
+    prefix = {'en': 'books/', 'ru': 'knigi/'}[translation.get_language()[:2]]
+    return f'{prefix}{suffix}'
+
+
+@pytest.mark.parametrize('suffix', ['', '<int:pk>/'])
+@pytest.mark.parametrize('is_endpoint', [True, False])
+def test_lazy_route(*, suffix: str, is_endpoint: bool) -> None:
+    """Ensures that lazy routes are resolved in the active language."""
+    pattern = PrefixRoutePattern(
+        lazy(_translated, str)(suffix),
+        is_endpoint=is_endpoint,
+    )
+    expected = {'pk': 1} if suffix else {}
+    tail = '1/' if suffix else ''
+
+    with translation.override('en'):
+        assert pattern.match(f'books/{tail}') is not None
+    with translation.override('ru'):
+        matched = pattern.match(f'knigi/{tail}')
+        assert matched is not None
+        assert matched[2] == expected
+        assert pattern.match(f'books/{tail}') is None

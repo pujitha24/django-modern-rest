@@ -56,6 +56,12 @@ ask your coding agent to use `$dmr-upgrade` to upgrade a project.
 
 ### Bugfixes
 
+#### Routing
+
+- Fixed lazy (translated) routes in `dmr.routing.path`
+  resolving only in the language active at import time
+  and raising `TypeError` when used with `include`, #1699
+
 #### Auth and security
 
 - Fixed `jwt_expiration` and `jwt_refresh_expiration` passed to `as_view`

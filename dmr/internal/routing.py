@@ -2,7 +2,10 @@ import dataclasses
 from typing import TYPE_CHECKING, Any, Self, TypeAlias, final
 
 from django.urls.resolvers import RoutePattern
+from django.utils.functional import Promise
 from typing_extensions import override
+
+from dmr.internal.types import StrOrPromise
 
 if TYPE_CHECKING:
     from dmr.routing import Router
@@ -55,26 +58,31 @@ class PrefixRoutePattern(RoutePattern):
 
     def __init__(
         self,
-        route: str,
+        route: StrOrPromise,
         name: str | None = None,
         is_endpoint: bool = False,  # noqa: FBT001, FBT002
     ) -> None:
         """Static patterns would work faster."""
-        idx = route.find('<')
-        if idx == -1:
-            self._prefix = route
-            self._is_static = True
-        else:
+        self._is_lazy = isinstance(route, Promise)
+        if isinstance(route, Promise):
+            # Lazy routes depend on the active language, so nothing
+            # can be precomputed: we rely on Django's own matching.
             self._is_static = False
-            self._prefix = route[:idx]
+            self._prefix = ''
+        else:
+            idx = route.find('<')
+            self._is_static = idx == -1
+            self._prefix = route if self._is_static else route[:idx]
         self._is_endpoint = is_endpoint
-        super().__init__(route, name, is_endpoint)
+        super().__init__(route, name, is_endpoint)  # type: ignore[arg-type]
 
     @override
     def match(
         self,
         path: str,
     ) -> _RouteMatch | None:
+        if self._is_lazy:
+            return super().match(path)  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
         if self._is_static:
             if self._is_endpoint and path == self._prefix:
                 return '', (), {}
